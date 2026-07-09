@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>แดชบอร์ดผู้บริหาร - คลังยา</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  body { background:#f4f6f9; font-family:'Segoe UI',Tahoma,sans-serif; }
+  .navbar-exec { background:#0c447c; }
+  .kpi-card { border:none; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .kpi-value { font-size:28px; font-weight:700; }
+  .kpi-label { font-size:13px; color:#6c757d; }
+  .chart-card { border:none; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,0.06); padding:1rem; }
+  .table thead th { font-size:12px; color:#6c757d; border-bottom:1px solid #e9ecef; }
+  .badge-danger-soft { background:#fdecea; color:#c0392b; }
+  .badge-warning-soft { background:#fff8e6; color:#b7791f; }
+  .last-updated { font-size:12px; color:#adb5bd; }
+  #loadingOverlay { position:fixed; inset:0; background:#f4f6f9; z-index:9999; display:flex; align-items:center; justify-content:center; }
+  #errorBox { display:none; }
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="text-center">
+    <div class="spinner-border text-primary" role="status"></div>
+    <p class="mt-3 text-muted">กำลังโหลดข้อมูล...</p>
+  </div>
+</div>
+
+<nav class="navbar navbar-exec navbar-dark px-3 py-3">
+  <span class="navbar-brand mb-0 h5"><i class="fa-solid fa-chart-line me-2"></i>แดชบอร์ดผู้บริหาร - คลังยา</span>
+  <span class="last-updated text-white-50" id="lastUpdated"></span>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+  <div id="errorBox" class="alert alert-danger">
+    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    <span id="errorText"></span>
+  </div>
+
+  <!-- KPI cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card kpi-card p-3">
+        <div class="kpi-label">จำนวนรายการยาในคลัง</div>
+        <div class="kpi-value text-dark" id="kpiValue">-</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card kpi-card p-3">
+        <div class="kpi-label">สต็อกต่ำกว่าเกณฑ์</div>
+        <div class="kpi-value text-danger" id="kpiLow">-</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card kpi-card p-3">
+        <div class="kpi-label">ใกล้หมดอายุ (3 เดือน)</div>
+        <div class="kpi-value" style="color:#b7791f" id="kpiExp">-</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card kpi-card p-3">
+        <div class="kpi-label">ยอดจ่ายยาวันนี้</div>
+        <div class="kpi-value text-dark" id="kpiToday">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-7">
+      <div class="chart-card h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-bold">ยอดจ่ายยารายวัน (30 วันล่าสุด)</span>
+        </div>
+        <div style="position:relative; height:280px;">
+          <canvas id="dailyChart" role="img" aria-label="กราฟเส้นแสดงยอดจ่ายยารายวันย้อนหลัง 30 วัน"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-card h-100">
+        <div class="fw-bold mb-2">สต็อกต่ำกว่าเกณฑ์ (10 อันดับ)</div>
+        <div style="position:relative; height:280px;">
+          <canvas id="lowStockChart" role="img" aria-label="กราฟแท่งแสดงยาที่สต็อกต่ำกว่าเกณฑ์ 10 อันดับแรก"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="chart-card h-100">
+        <div class="fw-bold mb-3"><i class="fa-solid fa-calendar-xmark me-2 text-warning"></i>รายการยาใกล้หมดอายุ</div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>ชื่อยา</th><th>Lot</th><th class="text-end">คงเหลือ</th><th class="text-end">วันหมดอายุ</th></tr></thead>
+            <tbody id="expTableBody"><tr><td colspan="4" class="text-center text-muted py-3">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-card h-100">
+        <div class="fw-bold mb-3"><i class="fa-solid fa-ranking-star me-2 text-primary"></i>ยาที่จ่ายมากที่สุด (30 วัน)</div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>ชื่อยา</th><th class="text-end">จำนวนที่จ่าย</th></tr></thead>
+            <tbody id="topDrugTableBody"><tr><td colspan="2" class="text-center text-muted py-3">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ==========================================================================
+   CONFIG - แก้ตรงนี้ให้ตรงกับโปรเจกต์ Supabase จริงของคุณ
+   ========================================================================== */
+const SUPABASE_URL = "https://osdxhimmnbefszbjljxj.supabase.co";   // แก้เป็น Project URL จริง
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZHhoaW1tbmJlZnN6YmpsanhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MjQ3NTEsImV4cCI6MjA5ODQwMDc1MX0.qFQBSHFWDsuBY9BRsVr6VkJDD7F1LnUL8F3VfzS8dx4";           // แก้เป็น anon public key จริง (ห้ามใช้ service_role key เด็ดขาด)
+
+// ชื่อ table ตรงตาม schema จริง: drug_stock (สต็อก), drug_master (ชื่อยา), records (ประวัติจ่ายยา)
+const TABLE_STOCK  = "drug_stock";
+const TABLE_MASTER = "drug_master";
+const TABLE_LOGS   = "records";
+
+// records มีทั้ง time และ created_at — ใช้ "time" เป็นเวลาจ่ายยาจริง (fallback เป็น created_at ถ้าไม่มี)
+const LOG_TIME_FIELD = "time";
+/* ========================================================================== */
+
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const REFRESH_MS = 5 * 60 * 1000; // auto-refresh ทุก 5 นาที
+
+function showError(msg) {
+  document.getElementById("errorBox").style.display = "block";
+  document.getElementById("errorText").textContent = msg;
+}
+
+function formatMoney(n) {
+  if (n === null || n === undefined || isNaN(n)) return "-";
+  return "฿" + Number(n).toLocaleString("th-TH", { maximumFractionDigits: 0 });
+}
+
+function formatDateTH(d) {
+  if (!d) return "-";
+  const dt = new Date(d);
+  if (isNaN(dt)) return d;
+  return dt.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+let dailyChartInstance = null;
+let lowStockChartInstance = null;
+
+async function loadDashboard() {
+  try {
+    // ดึง drug_stock, drug_master, records แยกกัน แล้วเอามา join กันเองในโค้ด
+    // (ไม่ใช้ auto-join ของ Supabase เพราะต้องพึ่ง Foreign Key constraint ในฐานข้อมูล)
+    const [
+      { data: stockRows, error: stockErr },
+      { data: masterRows, error: masterErr },
+      { data: logRows, error: logsErr }
+    ] = await Promise.all([
+      sbClient.from(TABLE_STOCK).select("id, drug_id, lot, mfg, exp, stock, min_stock, max_stock, created_at"),
+      sbClient.from(TABLE_MASTER).select("drug_id, name, strength, form"),
+      // ดึงเฉพาะคอลัมน์ที่จำเป็น "ไม่รวม" pt_name และ pt_hn (ข้อมูลผู้ป่วย) เพื่อไม่ให้ข้อมูลผู้ป่วยหลุดไปที่ browser
+      sbClient.from(TABLE_LOGS)
+        .select("id, time, name, strength, form, qty, drug_id, created_at")
+        .order(LOG_TIME_FIELD, { ascending: false })
+        .limit(5000)
+    ]);
+
+    if (stockErr) throw new Error("โหลดข้อมูลสต็อกยาไม่สำเร็จ: " + stockErr.message);
+    if (masterErr) throw new Error("โหลดข้อมูลรายชื่อยาไม่สำเร็จ: " + masterErr.message);
+    if (logsErr) throw new Error("โหลดประวัติจ่ายยาไม่สำเร็จ: " + logsErr.message);
+
+    // ทำ lookup table จาก drug_master โดยใช้ drug_id เป็น key
+    const masterByDrugId = {};
+    (masterRows || []).forEach(m => { masterByDrugId[m.drug_id] = m; });
+
+    // join drug_stock กับ drug_master เองใน JS ผ่าน drug_id
+    const drugs = (stockRows || []).map(d => {
+      const master = masterByDrugId[d.drug_id] || {};
+      return {
+        ...d,
+        name: master.name || "-",
+        strength: master.strength || "",
+        form: master.form || ""
+      };
+    });
+
+    // records มีชื่อ/ความแรงในตัวเองอยู่แล้ว (denormalized) ใช้ time เป็นหลัก fallback created_at
+    const logs = (logRows || []).map(l => ({
+      ...l,
+      _time: l[LOG_TIME_FIELD] || l.created_at
+    }));
+
+    renderKpis(drugs, logs);
+    renderDailyChart(logs);
+    renderLowStockChart(drugs);
+    renderExpiringTable(drugs);
+    renderTopDrugsTable(logs);
+
+    document.getElementById("lastUpdated").textContent =
+      "อัปเดตล่าสุด: " + new Date().toLocaleTimeString("th-TH");
+    document.getElementById("errorBox").style.display = "none";
+
+  } catch (err) {
+    console.error(err);
+    showError(err.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล");
+  } finally {
+    document.getElementById("loadingOverlay").style.display = "none";
+  }
+}
+
+function renderKpis(drugs, logs) {
+  // ไม่มีคอลัมน์ราคาใน schema นี้ เลยแสดงจำนวนรายการยาในคลังแทนมูลค่า
+  document.getElementById("kpiValue").textContent = drugs.length.toLocaleString("th-TH") + " รายการ";
+
+  const lowCount = drugs.filter(d => Number(d.stock) <= Number(d.min_stock)).length;
+  document.getElementById("kpiLow").textContent = lowCount + " รายการ";
+
+  const threeMonthsAway = new Date();
+  threeMonthsAway.setMonth(threeMonthsAway.getMonth() + 3);
+  const expCount = drugs.filter(d => d.exp && new Date(d.exp) <= threeMonthsAway).length;
+  document.getElementById("kpiExp").textContent = expCount + " รายการ";
+
+  const todayStr = new Date().toDateString();
+  const todayCount = logs
+    .filter(l => l._time && new Date(l._time).toDateString() === todayStr)
+    .reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+  document.getElementById("kpiToday").textContent = todayCount.toLocaleString("th-TH") + " หน่วย";
+}
+
+function renderDailyChart(logs) {
+  const days = [];
+  const counts = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit" });
+    days.push(key);
+    const dayTotal = logs
+      .filter(l => l._time && new Date(l._time).toDateString() === d.toDateString())
+      .reduce((sum, l) => sum + (Number(l.qty) || 0), 0);
+    counts.push(dayTotal);
+  }
+
+  const ctx = document.getElementById("dailyChart");
+  if (dailyChartInstance) dailyChartInstance.destroy();
+  dailyChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: days,
+      datasets: [{
+        data: counts,
+        borderColor: "#2a78d6",
+        backgroundColor: "rgba(42,120,214,0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 15 } },
+        y: { grid: { color: "#e9ecef" }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderLowStockChart(drugs) {
+  const low = drugs
+    .filter(d => Number(d.stock) <= Number(d.min_stock))
+    .map(d => ({ name: d.name, deficit: Number(d.min_stock) - Number(d.stock) }))
+    .sort((a, b) => b.deficit - a.deficit)
+    .slice(0, 10);
+
+  const ctx = document.getElementById("lowStockChart");
+  if (lowStockChartInstance) lowStockChartInstance.destroy();
+
+  if (low.length === 0) {
+    ctx.parentElement.innerHTML = '<div class="text-center text-muted py-5"><i class="fa-solid fa-circle-check fa-2x mb-2 text-success"></i><br>ไม่มีรายการต่ำกว่าเกณฑ์</div>';
+    return;
+  }
+
+  lowStockChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: low.map(d => d.name),
+      datasets: [{ data: low.map(d => d.deficit), backgroundColor: "#e34948", borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: "#e9ecef" }, beginAtZero: true, title: { display: true, text: "ขาดจากเกณฑ์ขั้นต่ำ" } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderExpiringTable(drugs) {
+  const threeMonthsAway = new Date();
+  threeMonthsAway.setMonth(threeMonthsAway.getMonth() + 3);
+
+  const expiring = drugs
+    .filter(d => d.exp && new Date(d.exp) <= threeMonthsAway && Number(d.stock) > 0)
+    .sort((a, b) => new Date(a.exp) - new Date(b.exp));
+
+  const body = document.getElementById("expTableBody");
+  if (expiring.length === 0) {
+    body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">ไม่มีรายการใกล้หมดอายุ</td></tr>';
+    return;
+  }
+
+  body.innerHTML = expiring.map(d => `
+    <tr>
+      <td>${d.name}${d.strength ? " (" + d.strength + ")" : ""}</td>
+      <td><span class="badge bg-secondary">${d.lot || "-"}</span></td>
+      <td class="text-end">${d.stock}</td>
+      <td class="text-end"><span class="badge badge-warning-soft">${formatDateTH(d.exp)}</span></td>
+    </tr>
+  `).join("");
+}
+
+function renderTopDrugsTable(logs) {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const totals = {};
+  logs
+    .filter(l => l._time && new Date(l._time) >= thirtyDaysAgo)
+    .forEach(l => {
+      const name = l.name || "-";
+      totals[name] = (totals[name] || 0) + (Number(l.qty) || 0);
+    });
+
+  const top = Object.entries(totals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const body = document.getElementById("topDrugTableBody");
+  if (top.length === 0) {
+    body.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-3">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+
+  body.innerHTML = top.map(([name, qty]) => `
+    <tr><td>${name}</td><td class="text-end fw-bold">${qty.toLocaleString("th-TH")}</td></tr>
+  `).join("");
+}
+
+loadDashboard();
+setInterval(loadDashboard, REFRESH_MS);
+</script>
+</body>
+</html>
