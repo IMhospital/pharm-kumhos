@@ -161,8 +161,9 @@ rt-PA | Antidote </title>
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
-    <div class="login-title">แดชบอร์ด - ระบบบันทึกจ่ายยา rt-PA</div>
-    <div class="login-subtitle">สำหรับบุคลากรภายในเท่านั้น กรุณาเข้าสู่ระบบด้วยอีเมลที่ได้รับอนุญาต</div>
+    <div class="login-title">แดชบอร์ด - ระบบบันทึกจ่ายยา</div>
+     <div class="login-subtitle"> กลุ่มงานเภสัชกรรม </div>
+    <div class="login-subtitle"> กรุณาเข้าสู่ระบบด้วยอีเมลที่ได้รับอนุญาต</div>
 
     <!-- ขั้นตอนที่ 1: กรอกอีเมล -->
     <form id="loginForm">
@@ -555,7 +556,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     document.getElementById("loginForm").style.display = "none";
     document.getElementById("otpForm").style.display = "block";
     document.getElementById("loginOtp").value = "";
-    setLoginStatus("ส่งรหัส 6 หลักไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย (รวมถึง Junk/Spam)", "success");
+    setLoginStatus("ส่งรหัส 8 หลักไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย (รวมถึง Junk/Spam)", "success");
     document.getElementById("loginOtp").focus();
   } catch (err) {
     console.error(err);
