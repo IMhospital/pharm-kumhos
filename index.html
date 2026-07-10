@@ -641,29 +641,93 @@ function renderDailyChart(logs, rangeStart, rangeEnd) {
 
   const ctx = document.getElementById("dailyChart");
   if (dailyChartInstance) dailyChartInstance.destroy();
+
+  const canvasCtx = ctx.getContext("2d");
+  const chartHeight = ctx.parentElement.clientHeight || 300;
+
+  // ไล่สีพื้นหลังใต้เส้นให้ดูมีมิติมากขึ้น
+  const areaGradient = canvasCtx.createLinearGradient(0, 0, 0, chartHeight);
+  areaGradient.addColorStop(0, "rgba(79,70,229,0.35)");
+  areaGradient.addColorStop(0.6, "rgba(79,70,229,0.08)");
+  areaGradient.addColorStop(1, "rgba(79,70,229,0)");
+
+  // ไล่สีเส้นกราฟ
+  const lineGradient = canvasCtx.createLinearGradient(0, 0, ctx.parentElement.clientWidth || 600, 0);
+  lineGradient.addColorStop(0, "#6366f1");
+  lineGradient.addColorStop(1, "#4338ca");
+
+  const maxVal = Math.max(...counts, 0);
+
   dailyChartInstance = new Chart(ctx, {
     type: "line",
     data: {
       labels: days,
       datasets: [{
         data: counts,
-        borderColor: "#4f46e5",
-        backgroundColor: "rgba(79,70,229,0.1)",
+        borderColor: lineGradient,
+        backgroundColor: areaGradient,
         fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        borderWidth: 2.5
+        tension: 0.35,
+        borderWidth: 3,
+        pointRadius: counts.map(v => v > 0 ? 3.5 : 0),
+        pointHoverRadius: 7,
+        pointBackgroundColor: counts.map(v => v === maxVal && maxVal > 0 ? "#e11d48" : "#4f46e5"),
+        pointBorderColor: "#ffffff",
+        pointBorderWidth: 2,
+        pointHoverBackgroundColor: "#e11d48",
+        pointHoverBorderColor: "#ffffff",
+        pointHoverBorderWidth: 2,
+        shadowOffsetX: 0,
+        shadowOffsetY: 4,
+        shadowBlur: 10,
+        shadowColor: "rgba(79,70,229,0.25)"
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1f2937",
+          titleColor: "#ffffff",
+          bodyColor: "#e5e7eb",
+          padding: 10,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            title: (items) => `วันที่ ${items[0].label}`,
+            label: (item) => `ยอดจ่ายยา: ${item.formattedValue} หน่วย`
+          }
+        }
+      },
       scales: {
-        x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 15 } },
-        y: { grid: { color: "#eef0f5" }, beginAtZero: true }
+        x: {
+          grid: { display: false },
+          ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 15 }
+        },
+        y: {
+          grid: { color: "#eef0f5" },
+          beginAtZero: true,
+          ticks: { precision: 0 }
+        }
+      },
+      elements: { line: { capBezierPoints: true } }
+    },
+    plugins: [{
+      id: "lineShadow",
+      beforeDatasetsDraw(chart) {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.shadowColor = "rgba(79,70,229,0.3)";
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 6;
+      },
+      afterDatasetsDraw(chart) {
+        chart.ctx.restore();
       }
-    }
+    }]
   });
 }
 
