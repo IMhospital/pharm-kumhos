@@ -713,7 +713,8 @@ function renderDailyChart(logs, rangeStart, rangeEnd) {
           ticks: { precision: 0 }
         }
       },
-      elements: { line: { capBezierPoints: true } }
+      elements: { line: { capBezierPoints: true } },
+      layout: { padding: { top: 26 } }
     },
     plugins: [{
       id: "lineShadow",
@@ -726,6 +727,25 @@ function renderDailyChart(logs, rangeStart, rangeEnd) {
       },
       afterDatasetsDraw(chart) {
         chart.ctx.restore();
+      }
+    }, {
+      id: "peakLabel",
+      afterDatasetsDraw(chart) {
+        const { ctx: c } = chart;
+        const meta = chart.getDatasetMeta(0);
+        if (maxVal <= 0) return;
+        counts.forEach((v, i) => {
+          if (v !== maxVal) return;
+          const point = meta.data[i];
+          if (!point) return;
+          c.save();
+          c.font = "600 12px 'Sarabun', sans-serif";
+          c.fillStyle = "#e11d48";
+          c.textAlign = "center";
+          c.textBaseline = "bottom";
+          c.fillText(`${v.toLocaleString("th-TH")} หน่วย`, point.x, point.y - 10);
+          c.restore();
+        });
       }
     }]
   });
