@@ -46,6 +46,33 @@ rt-PA | Antidote </title>
   .last-updated { font-size:12px; color:rgba(255,255,255,0.75); }
   #loadingOverlay { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; }
   #errorBox { display:none; border-radius:12px; }
+
+  /* หน้าล็อกอิน (Magic Link) */
+  #loginScreen {
+    position:fixed; inset:0; z-index:9998; display:none;
+    align-items:center; justify-content:center;
+    background:linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 55%, var(--accent) 100%);
+    padding:1rem;
+  }
+  #loginScreen .login-card {
+    background:#fff; border-radius:var(--card-radius); box-shadow:0 20px 50px rgba(31,41,55,0.25);
+    padding:2.2rem 2rem; width:100%; max-width:380px;
+  }
+  #loginScreen .login-icon {
+    width:56px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg, var(--primary), #7c6ff0); color:#fff; font-size:24px; margin:0 auto 1rem;
+  }
+  #loginScreen .login-title { font-size:17px; font-weight:800; text-align:center; color:#1f2937; margin-bottom:.25rem; }
+  #loginScreen .login-subtitle { font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:1.5rem; }
+  #loginScreen .form-control { border-radius:10px; padding:.65rem .9rem; }
+  #loginScreen .btn-login { border-radius:10px; padding:.65rem; font-weight:700; }
+  #loginStatus { font-size:13px; border-radius:10px; padding:.6rem .8rem; display:none; margin-top:1rem; }
+  #loginStatus.status-success { display:block; background:#e6f9f1; color:var(--success); }
+  #loginStatus.status-error { display:block; background:#fde8ec; color:var(--danger); }
+  #loginStatus.status-info { display:block; background:#eef2ff; color:var(--primary); }
+  #appContent { display:none; }
+  .btn-logout { color:rgba(255,255,255,0.85); font-size:12.5px; }
+  .btn-logout:hover { color:#fff; }
   .kpi-clickable { cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
   .kpi-clickable:hover { transform:translateY(-3px); box-shadow:0 10px 24px rgba(79,70,229,0.14); }
   .kpi-clickable .kpi-hint { font-size:11px; color:#a3a9b7; }
@@ -126,14 +153,40 @@ rt-PA | Antidote </title>
 <div id="loadingOverlay">
   <div class="text-center">
     <div class="spinner-border text-primary" role="status"></div>
-    <p class="mt-3 text-muted">กำลังโหลดข้อมูล...</p>
+    <p class="mt-3 text-muted">กำลังตรวจสอบสิทธิ์เข้าใช้งาน...</p>
   </div>
 </div>
+
+<!-- หน้าล็อกอิน (Supabase Auth - Magic Link) -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-icon"><i class="fa-solid fa-lock"></i></div>
+    <div class="login-title">แดชบอร์ด - ระบบบันทึกจ่ายยา rt-PA</div>
+    <div class="login-subtitle">สำหรับบุคลากรภายในเท่านั้น กรุณาเข้าสู่ระบบด้วยอีเมลที่ได้รับอนุญาต</div>
+
+    <form id="loginForm">
+      <label class="form-label small fw-semibold text-muted">อีเมล</label>
+      <input type="email" class="form-control mb-3" id="loginEmail" placeholder="name@hospital.go.th" required autocomplete="email">
+      <button type="submit" class="btn btn-primary w-100 btn-login" id="loginSubmitBtn">
+        <i class="fa-solid fa-paper-plane me-2"></i>ส่งลิงก์เข้าสู่ระบบ
+      </button>
+    </form>
+    <div id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="appContent">
 
 <nav class="navbar navbar-exec navbar-dark px-3 py-3 flex-wrap gap-1">
   <span class="navbar-brand mb-0 h5"><i class="fa-solid fa-chart-line me-2"></i>แดชบอร์ด - ระบบบันทึกจ่ายยา
 rt-PA | Antidote </span>
-  <span class="last-updated text-white-50" id="lastUpdated"></span>
+  <div class="d-flex align-items-center gap-3">
+    <span class="last-updated text-white-50" id="lastUpdated"></span>
+    <span class="last-updated text-white-50" id="loggedInEmail"></span>
+    <button class="btn btn-sm btn-outline-light btn-logout" id="logoutBtn" title="ออกจากระบบ">
+      <i class="fa-solid fa-right-from-bracket me-1"></i>ออกจากระบบ
+    </button>
+  </div>
 </nav>
 
 <div class="container-fluid py-4 px-4">
@@ -277,6 +330,31 @@ rt-PA | Antidote </span>
     </div>
   </div>
 
+  <!-- คาดการณ์วันที่สต็อกจะหมด (ตามอัตราการใช้เฉลี่ย 30 วันล่าสุด) -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="chart-card">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <span class="card-title-bar"><i class="fa-solid fa-hourglass-half me-2 text-danger"></i>คาดการณ์วันที่สต็อกจะหมด</span>
+          <span class="range-pill" style="background:#fef3e2; color:var(--warning);">อ้างอิงอัตราการใช้เฉลี่ย 30 วันล่าสุด</span>
+        </div>
+        <div class="table-responsive" style="max-height:320px; overflow-y:auto;">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="sticky-top bg-white"><tr>
+              <th>ชื่อยา</th>
+              <th class="text-end">คงเหลือ</th>
+              <th class="text-end">อัตราใช้เฉลี่ย/วัน</th>
+              <th class="text-end">คาดว่าจะหมดใน</th>
+              <th class="text-end">วันที่คาดว่าจะหมด</th>
+            </tr></thead>
+            <tbody id="stockForecastBody"><tr><td colspan="5" class="text-center text-muted py-3">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="small text-muted mt-2"><i class="fa-solid fa-circle-info me-1"></i>คำนวณจากยอดจ่ายยาเฉลี่ยต่อวันในช่วง 30 วันล่าสุด เทียบกับสต็อกคงเหลือปัจจุบัน แสดงเฉพาะรายการที่คาดว่าจะหมดภายใน 60 วัน เรียงจากด่วนที่สุด — ใช้เป็นข้อมูลประกอบการตัดสินใจสั่งซื้อ ไม่ใช่ค่าที่แม่นยำสมบูรณ์</div>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3">
     <div class="col-lg-6">
       <div class="chart-card h-100">
@@ -340,11 +418,13 @@ rt-PA | Antidote </span>
   </div>
 
   <footer class="app-footer">
-    <div class="footer-brand"><i class="fa-solid fa-chart-line me-1"></i>แดชบอร์ด - ระบบบันทึกจ่ายยา rt-PA | Antidote</div>
-    <div class="mt-1">ข้อมูลอัปเดตอัตโนมัติทุก 5 นาที </div>
-    <div class="mt-1">© <span id="footerYear"></span> Kumphawapi Hospital | พัฒนาโดย : สายัญ ธุนันทา </div>
+    <div class="footer-brand"><i class="fa-solid fa-chart-line me-1"></i>แดชบอร์ดผู้บริหาร - คลังยา</div>
+    <div class="mt-1">ข้อมูลอัปเดตอัตโนมัติทุก 5 นาที · ระบบสำหรับใช้งานภายในองค์กรเท่านั้น</div>
+    <div class="mt-1">© <span id="footerYear"></span> ฝ่ายเภสัชกรรม พัฒนาโดย : สายัญ ธุนันทา</div>
   </footer>
 </div>
+
+</div><!-- /#appContent -->
 
 <!-- Detail Modal: แสดงรายชื่อยาจริงเมื่อคลิกการ์ด KPI -->
 <div class="modal fade" id="detailModal" tabindex="-1">
@@ -389,6 +469,96 @@ const LOG_STAFF_FIELD = "staff";
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const REFRESH_MS = 5 * 60 * 1000; // auto-refresh ทุก 5 นาที
+
+/* ==========================================================================
+   AUTH GATE — Supabase Auth (Magic Link)
+   หน้าเว็บนี้จะไม่โหลด/แสดงข้อมูลใดๆ จนกว่าจะยืนยันตัวตนผ่าน Supabase Auth แล้ว
+   หมายเหตุสำคัญ: หน้าจอ Login นี้ป้องกันการ "เห็น" ข้อมูลผ่านหน้าเว็บเท่านั้น
+   เพื่อความปลอดภัยที่แท้จริง ต้องเปิด Row Level Security (RLS) บนทุกตารางฝั่ง
+   Supabase ด้วย ให้อนุญาตเฉพาะ role "authenticated" เท่านั้น ไม่เช่นนั้นข้อมูลยัง
+   ถูกดึงตรงผ่าน REST API ได้โดยไม่ผ่านหน้านี้
+   ========================================================================== */
+function showLoginScreen() {
+  document.getElementById("appContent").style.display = "none";
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("loadingOverlay").style.display = "none";
+}
+
+function showAppContent(session) {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("appContent").style.display = "block";
+  document.getElementById("loggedInEmail").innerHTML =
+    `<i class="fa-solid fa-user me-1"></i>${session?.user?.email || ""}`;
+  startDashboard();
+}
+
+let DASHBOARD_STARTED = false;
+function startDashboard() {
+  if (DASHBOARD_STARTED) return; // กันไม่ให้ตั้ง interval / โหลดซ้ำเวลามีเหตุการณ์ auth เปลี่ยนสถานะหลายครั้ง
+  DASHBOARD_STARTED = true;
+  document.getElementById("footerYear").textContent = new Date().getFullYear();
+  initDateRange();
+  loadDashboard();
+  setInterval(loadDashboard, REFRESH_MS);
+}
+
+function setLoginStatus(message, type) {
+  const el = document.getElementById("loginStatus");
+  el.textContent = message;
+  el.className = "status-" + type; // success | error | info
+}
+
+// ฟอร์มส่ง Magic Link
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  const btn = document.getElementById("loginSubmitBtn");
+  if (!email) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>กำลังส่งลิงก์...';
+  setLoginStatus("", "");
+
+  try {
+    const { error } = await sbClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
+    if (error) throw error;
+    setLoginStatus("ส่งลิงก์เข้าสู่ระบบไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย (รวมถึง Junk/Spam) แล้วคลิกลิงก์เพื่อเข้าใช้งาน", "success");
+  } catch (err) {
+    console.error(err);
+    setLoginStatus("ส่งลิงก์ไม่สำเร็จ: " + (err.message || "กรุณาลองใหม่อีกครั้ง"), "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane me-2"></i>ส่งลิงก์เข้าสู่ระบบ';
+  }
+});
+
+// ปุ่มออกจากระบบ
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await sbClient.auth.signOut();
+  window.location.reload();
+});
+
+// ตรวจสอบสถานะการล็อกอินเมื่อเปิดหน้าเว็บครั้งแรก (รวมถึงตอนคลิกลิงก์จากอีเมลกลับมา)
+(async () => {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (session) {
+    showAppContent(session);
+  } else {
+    showLoginScreen();
+  }
+})();
+
+// ดักจับการเปลี่ยนสถานะ auth (เช่น หลังคลิก Magic Link แล้ว Supabase ยืนยันตัวตนสำเร็จ)
+sbClient.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_IN" && session) {
+    showAppContent(session);
+  } else if (event === "SIGNED_OUT") {
+    showLoginScreen();
+  }
+});
 
 let STAFF_FIELD_AVAILABLE = true;
 
@@ -579,6 +749,7 @@ async function loadDashboard() {
     renderDailyChart(logs, RANGE_START, RANGE_END);
     renderLowStockChart(drugs);
     renderMonthComparisonChart(logs);
+    renderStockForecast(drugs, logs);
     renderExpiringTable(drugs);
     renderTopDrugsTable(logs, RANGE_START, RANGE_END);
     renderStaffSummary(logs, RANGE_START, RANGE_END);
@@ -861,6 +1032,74 @@ function renderMonthComparisonChart(logs) {
   });
 }
 
+/* ==========================================================================
+   คาดการณ์วันที่สต็อกจะหมด — คำนวณจากอัตราการใช้เฉลี่ยต่อวันใน 30 วันล่าสุด
+   เทียบกับสต็อกคงเหลือปัจจุบัน แสดงเฉพาะรายการที่คาดว่าจะหมดภายใน 60 วัน
+   หมายเหตุ: เป็นการประมาณการอย่างง่าย ไม่ได้คำนึงถึงฤดูกาล/แนวโน้มที่เปลี่ยนแปลง
+   ========================================================================== */
+function computeAvgDailyUsage(logs, lookbackDays) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - lookbackDays);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const totalByDrug = {};
+  logs.forEach(l => {
+    if (l._time && l._time >= cutoff && l.drug_id != null) {
+      totalByDrug[l.drug_id] = (totalByDrug[l.drug_id] || 0) + (Number(l.qty) || 0);
+    }
+  });
+
+  const rateByDrug = {};
+  Object.keys(totalByDrug).forEach(k => { rateByDrug[k] = totalByDrug[k] / lookbackDays; });
+  return rateByDrug;
+}
+
+function renderStockForecast(drugs, logs) {
+  const LOOKBACK_DAYS = 30;
+  const MAX_DAYS_SHOWN = 60;
+
+  const avgUsage = computeAvgDailyUsage(logs, LOOKBACK_DAYS);
+
+  const forecast = drugs
+    .map(d => {
+      const rate = avgUsage[d.drug_id] || 0;
+      const daysLeft = rate > 0 ? Math.floor(Number(d.stock) / rate) : null;
+      return { ...d, dailyRate: rate, daysLeft };
+    })
+    .filter(d => d.daysLeft !== null && d.daysLeft <= MAX_DAYS_SHOWN)
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 15);
+
+  const body = document.getElementById("stockForecastBody");
+  if (!body) return;
+
+  if (forecast.length === 0) {
+    body.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">
+      <i class="fa-solid fa-circle-check text-success me-1"></i>
+      ไม่มีรายการที่คาดว่าจะหมดภายใน ${MAX_DAYS_SHOWN} วันข้างหน้า (หรือยังไม่มีประวัติการจ่ายยาในช่วง ${LOOKBACK_DAYS} วันล่าสุดเพียงพอสำหรับคาดการณ์)
+    </td></tr>`;
+    return;
+  }
+
+  body.innerHTML = forecast.map(d => {
+    let badgeClass = "badge bg-light text-dark border";
+    if (d.daysLeft <= 7) badgeClass = "badge badge-danger-soft";
+    else if (d.daysLeft <= 14) badgeClass = "badge badge-warning-soft";
+
+    const estDate = new Date();
+    estDate.setDate(estDate.getDate() + d.daysLeft);
+
+    return `
+    <tr>
+      <td>${d.name}${d.strength ? ` (${d.strength})` : ""}</td>
+      <td class="text-end">${Number(d.stock).toLocaleString("th-TH")}</td>
+      <td class="text-end">${d.dailyRate.toLocaleString("th-TH", { maximumFractionDigits: 1 })} / วัน</td>
+      <td class="text-end"><span class="${badgeClass}">~${d.daysLeft.toLocaleString("th-TH")} วัน</span></td>
+      <td class="text-end">${formatDateTH(estDate)}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderExpiringTable(drugs) {
   const threeMonthsAway = new Date();
   threeMonthsAway.setMonth(threeMonthsAway.getMonth() + 3);
@@ -1115,12 +1354,6 @@ function openDetailModal(type) {
   bodyEl.innerHTML = html;
   new bootstrap.Modal(document.getElementById("detailModal")).show();
 }
-
-document.getElementById("footerYear").textContent = new Date().getFullYear();
-
-initDateRange();
-loadDashboard();
-setInterval(loadDashboard, REFRESH_MS);
 </script>
 </body>
 </html>
